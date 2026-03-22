@@ -68,7 +68,7 @@ async def handle_health(user_id: int, text: str) -> str:
     try:
         items = await _api_client.get("/items/")
         count = len(items) if isinstance(items, list) else "unknown"
-        return f"✅ Backend is healthy. {count} items available."
+        return f"✅ Health OK. Backend running with {count} items."
     except (ConnectionError, httpx.HTTPStatusError, Exception) as e:
         return _api_client.format_error_message(e)
 
