@@ -46,8 +46,8 @@ async def run_test_mode(command: str) -> None:
     # Get handler for this command
     handler = COMMAND_HANDLERS.get(cmd)
     if not handler:
-        print(f"Unknown command: {command}")
-        sys.exit(1)
+        print(f"Unknown command: {command}\n\nUse /help to see available commands.")
+        sys.exit(0)  # Don't crash - just inform the user
 
     # Call handler (user_id=0 for test mode)
     response = await handler(user_id=0, text=arg)
