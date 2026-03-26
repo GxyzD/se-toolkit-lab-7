@@ -1,13 +1,18 @@
 [project]
 name = "lms-bot"
 version = "0.1.0"
-description = "LMS Telegram Bot"
-requires-python = "==3.14.2"
+description = "Telegram bot for LMS"
+requires-python = ">=3.11"
 dependencies = [
-    "aiogram>=3.20",
-    "httpx==0.28.1",
-    "pydantic-settings==2.12.0",
-    "python-dotenv>=1.2.2",
-    "python-telegram-bot>=22.7",
-    "requests>=2.33.0",
+    "python-telegram-bot>=21.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.32.0",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["bot", "config", "router", "tools"]
+packages = ["handlers", "services"]
