@@ -95,3 +95,55 @@ By the end of this lab, you should be able to say:
 ### Optional
 
 1. [Flutter Web Chatbot](./lab/tasks/optional/task-1.md)
+
+## Deploy
+
+### Prerequisites
+
+Ensure the following environment variables are set in `.env.docker.secret`:
+
+- `BOT_TOKEN` — Telegram bot token from [@BotFather](https://t.me/BotFather)
+- `LMS_API_KEY` — Backend API key for authentication
+- `LLM_API_KEY` — LLM provider API key
+- `LLM_API_MODEL` — Model name (optional, defaults to `coder-model`)
+
+### Deployment steps
+
+1. **Stop the background bot process** (if running):
+   ```bash
+   cd ~/se-toolkit-lab-7
+   pkill -f "bot.py" 2>/dev/null
+   ```
+
+2. **Build and start all services**:
+   ```bash
+   docker compose --env-file .env.docker.secret up --build -d
+   ```
+
+3. **Verify services are running**:
+   ```bash
+   docker compose --env-file .env.docker.secret ps
+   ```
+   
+   You should see the `bot` service running alongside `backend`, `postgres`, and `caddy`.
+
+4. **Check bot logs**:
+   ```bash
+   docker compose --env-file .env.docker.secret logs bot --tail 20
+   ```
+   
+   Look for "Application started" and polling messages without tracebacks.
+
+5. **Test in Telegram**:
+   - `/start` — welcome message
+   - `/health` — backend status
+   - "what labs are available?" — natural language query
+
+### Troubleshooting
+
+| Symptom | Solution |
+|---------|----------|
+| Bot container restarting | Check logs for missing env vars or import errors |
+| `/health` fails | Ensure `LMS_API_BASE_URL=http://backend:8000` (not localhost) |
+| LLM queries fail | Use `host.docker.internal` for `LLM_API_BASE_URL` |
+| `BOT_TOKEN is required` | Add to `.env.docker.secret`, not `.env.bot.secret` |

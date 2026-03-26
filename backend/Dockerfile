@@ -1,12 +1,11 @@
-FROM harbor.pg.innopolis.university/docker-hub-cache/python:3.14.2-slim-bookworm
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
-RUN pip install --no-cache-dir fastapi uvicorn sqlalchemy psycopg2-binary python-dotenv requests
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code
-COPY backend/ /app/
+COPY backend/ .
 
-# Run the backend
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+

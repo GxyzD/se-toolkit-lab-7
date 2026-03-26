@@ -1,21 +1,12 @@
-FROM harbor.pg.innopolis.university/docker-hub-cache/python:3.14.2-slim-bookworm
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install uv
-RUN pip install --no-cache-dir uv
-
-# Copy pyproject.toml and uv.lock first for better caching
-COPY bot/pyproject.toml bot/uv.lock /app/
-
-# Install dependencies using uv
-RUN uv sync --frozen
+# Install dependencies directly with pip
+COPY bot/requirements.txt /app/requirements.txt
+RUN pip install -r requirements.txt
 
 # Copy bot code
 COPY bot/ /app/
 
-# Copy environment file
-COPY .env.docker.secret /app/.env.bot.secret
-
-# Run the bot
-CMD ["python", "-m", "bot"]
+CMD ["python", "bot.py"]
