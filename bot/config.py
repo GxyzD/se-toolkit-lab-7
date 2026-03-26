@@ -1,32 +1,33 @@
-"""Configuration loader for the Telegram bot.
-
-Reads secrets from .env.bot.secret (gitignored) using pydantic-settings.
+"""
+Bot configuration from environment variables.
 """
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env.bot.secret
+load_dotenv('.env.bot.secret')
 
 
-class BotConfig(BaseSettings):
-    """Bot configuration loaded from environment variables."""
-
-    model_config = SettingsConfigDict(
-        env_file=".env.bot.secret",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    # Telegram bot token (required for Telegram mode, not needed for --test)
-    bot_token: str = ""
-
-    # LMS API configuration
-    lms_api_base_url: str = "http://localhost:42002"
-    lms_api_key: str = ""
-
-    # LLM API configuration (for Task 3)
-    llm_api_key: str = ""
-    llm_api_base_url: str = "http://localhost:42005/v1"
-    llm_api_model: str = "coder-model"
-
-
-# Global config instance
-config = BotConfig()
+class Config:
+    """Bot configuration."""
+    
+    # Telegram
+    BOT_TOKEN = os.getenv('BOT_TOKEN', '')
+    
+    # Backend API
+    LMS_API_BASE_URL = os.getenv('LMS_API_BASE_URL', 'http://localhost:42002')
+    LMS_API_KEY = os.getenv('LMS_API_KEY', '')
+    
+    # LLM (for Task 3)
+    LLM_API_BASE_URL = os.getenv('LLM_API_BASE_URL', 'http://localhost:42005/v1')
+    LLM_API_KEY = os.getenv('LLM_API_KEY', '')
+    LLM_API_MODEL = os.getenv('LLM_API_MODEL', 'coder-model')
+    
+    @classmethod
+    def validate(cls) -> bool:
+        """Check that required settings are present."""
+        # In test mode, BOT_TOKEN is optional
+        if os.getenv('_TEST_MODE') == '1':
+            return bool(cls.LMS_API_KEY)
+        return bool(cls.BOT_TOKEN and cls.LMS_API_KEY)

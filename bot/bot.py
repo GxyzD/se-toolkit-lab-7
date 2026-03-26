@@ -19,6 +19,7 @@ from handlers.start_handler import (
     handle_labs,
     handle_scores,
     handle_start,
+    handle_message,
 )
 
 
@@ -33,32 +34,64 @@ COMMAND_HANDLERS = {
 
 
 async def run_test_mode(command: str) -> None:
-    """Run a command in test mode (no Telegram connection).
-
-    Args:
-        command: Command string like "/start" or "/scores lab-04"
-    """
+    """Run a command in test mode (no Telegram connection)."""
     # Parse command and arguments
     parts = command.strip().split(maxsplit=1)
-    cmd = parts[0].lstrip("/").lower()
+    first_part = parts[0]
     arg = parts[1] if len(parts) > 1 else ""
 
-    # Get handler for this command
-    handler = COMMAND_HANDLERS.get(cmd)
-    if not handler:
-        print(f"Unknown command: {command}\n\nUse /help to see available commands.")
-        sys.exit(0)  # Don't crash - just inform the user
-
-    # Call handler (user_id=0 for test mode)
-    response = await handler(user_id=0, text=arg)
-    print(response)
+    # Check if it's a slash command
+    if first_part.startswith('/'):
+        cmd = first_part.lstrip("/").lower()
+        if cmd in COMMAND_HANDLERS:
+            handler = COMMAND_HANDLERS[cmd]
+            response = await handler(user_id=0, text=arg)
+            print(response)
+            return
+        else:
+            # Unknown command
+            print(f"Unknown command: {command}\n\nUse /help to see available commands.")
+            return
+    else:
+        # Not a slash command — treat as natural language message
+        response = await handle_message(user_id=0, text=command)
+        print(response)
 
 
 async def run_telegram_mode() -> None:
     """Run the bot in Telegram mode (requires BOT_TOKEN)."""
-    # TODO: Task 2 — implement Telegram bot startup
-    print("Telegram mode not yet implemented (Task 2)")
-    print("For now, use --test mode to verify handlers.")
+    try:
+        from telegram.ext import Application, CommandHandler, MessageHandler, filters
+        from config import Config
+        
+        if not Config.BOT_TOKEN:
+            print("ERROR: BOT_TOKEN not set. Check .env.bot.secret")
+            sys.exit(1)
+        
+        # Create application
+        app = Application.builder().token(Config.BOT_TOKEN).build()
+        
+        # Add command handlers
+        app.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text(handle_start(u.effective_user.id))))
+        app.add_handler(CommandHandler("help", lambda u, c: u.message.reply_text(handle_help(u.effective_user.id))))
+        app.add_handler(CommandHandler("health", lambda u, c: u.message.reply_text(handle_health(u.effective_user.id))))
+        app.add_handler(CommandHandler("labs", lambda u, c: u.message.reply_text(handle_labs(u.effective_user.id))))
+        app.add_handler(CommandHandler("scores", lambda u, c: u.message.reply_text(handle_scores(u.effective_user.id, c.args[0] if c.args else ""))))
+        
+        # Add handler for regular messages (not commands)
+        async def text_handler(update, context):
+            user_message = update.message.text
+            response = await handle_message(user_id=update.effective_user.id, text=user_message)
+            await update.message.reply_text(response)
+        
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+        
+        print("Bot is running... Press Ctrl+C to stop.")
+        await app.run_polling()
+        
+    except ImportError:
+        print("ERROR: python-telegram-bot not installed. Run: uv sync")
+        sys.exit(1)
 
 
 async def main() -> None:
@@ -67,6 +100,7 @@ async def main() -> None:
         if len(sys.argv) < 3:
             print("Usage: uv run bot.py --test <command>")
             print("Example: uv run bot.py --test '/start'")
+            print("Example: uv run bot.py --test 'what labs are available'")
             sys.exit(1)
         command = " ".join(sys.argv[2:])
         await run_test_mode(command)
