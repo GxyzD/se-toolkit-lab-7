@@ -2,8 +2,14 @@ FROM harbor.pg.innopolis.university/docker-hub-cache/python:3.14.2-slim-bookworm
 
 WORKDIR /app
 
-# Install dependencies directly with pip
-RUN pip install --no-cache-dir python-telegram-bot python-dotenv requests
+# Install uv
+RUN pip install --no-cache-dir uv
+
+# Copy pyproject.toml and uv.lock first for better caching
+COPY bot/pyproject.toml bot/uv.lock /app/
+
+# Install dependencies using uv
+RUN uv sync --frozen
 
 # Copy bot code
 COPY bot/ /app/
