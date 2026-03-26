@@ -1,0 +1,3 @@
+nohup: ignoring input
+Telegram mode not yet implemented (Task 2)
+For now, use --test mode to verify handlers.
