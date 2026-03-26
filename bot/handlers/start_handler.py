@@ -1,6 +1,5 @@
 """Handlers for bot commands."""
 
-import re
 import sys
 from pathlib import Path
 
@@ -76,22 +75,24 @@ async def handle_labs(user_id: int, text: str = "") -> str:
 
 
 async def handle_scores(user_id: int, text: str = "") -> str:
+    """Handle /scores <lab> command."""
     lab_id = text.strip()
     if not lab_id:
         return "Error: Please specify a lab ID. Example: /scores lab-04"
-    if not re.match(r'lab-\d{2}', lab_id):
-        match = re.search(r'(\d+)', lab_id)
-        if match:
-            lab_id = f"lab-{int(match.group(1)):02d}"
+    
+    # Просто передаём lab_id как есть, без нормализации
     client = get_client()
     result = client.get_pass_rates(lab_id)
+    
     if result is None:
         return f"Error: Cannot connect for {lab_id}."
     if 'error' in result:
         return f"Error: {result['error']}"
+    
     pass_rates = result.get('pass_rates') or result.get('data') or result.get('items')
     if not pass_rates:
         return f"No data for {lab_id}."
+    
     lines = [f"Pass rates for {lab_id}:"]
     for item in pass_rates:
         if isinstance(item, dict):

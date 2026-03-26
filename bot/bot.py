@@ -61,7 +61,8 @@ async def run_test_mode(command: str) -> None:
 async def run_telegram_mode() -> None:
     """Run the bot in Telegram mode (requires BOT_TOKEN)."""
     try:
-        from telegram.ext import Application, CommandHandler, MessageHandler, filters
+        from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         from config import Config
         
         if not Config.BOT_TOKEN:
@@ -71,26 +72,131 @@ async def run_telegram_mode() -> None:
         # Create application
         app = Application.builder().token(Config.BOT_TOKEN).build()
         
-        # Add command handlers
-        app.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text(handle_start(u.effective_user.id))))
-        app.add_handler(CommandHandler("help", lambda u, c: u.message.reply_text(handle_help(u.effective_user.id))))
-        app.add_handler(CommandHandler("health", lambda u, c: u.message.reply_text(handle_health(u.effective_user.id))))
-        app.add_handler(CommandHandler("labs", lambda u, c: u.message.reply_text(handle_labs(u.effective_user.id))))
-        app.add_handler(CommandHandler("scores", lambda u, c: u.message.reply_text(handle_scores(u.effective_user.id, c.args[0] if c.args else ""))))
+        # Command handlers
+        async def start_command(update, context):
+            keyboard = [
+                [InlineKeyboardButton("📋 Labs", callback_data="labs"),
+                 InlineKeyboardButton("📊 Scores", callback_data="scores_menu")],
+                [InlineKeyboardButton("ℹ️ Health", callback_data="health"),
+                 InlineKeyboardButton("❓ Help", callback_data="help")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "Welcome to LMS Bot! Choose an option:",
+                reply_markup=reply_markup
+            )
         
-        # Add handler for regular messages (not commands)
+        async def help_command(update, context):
+            keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="back")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "/start - Welcome\n"
+                "/help - This help\n"
+                "/health - Backend status\n"
+                "/labs - List labs\n"
+                "/scores <lab> - Scores for a lab",
+                reply_markup=reply_markup
+            )
+        
+        async def health_command(update, context):
+            response = await handle_health(update.effective_user.id)
+            await update.message.reply_text(response)
+        
+        async def labs_command(update, context):
+            response = await handle_labs(update.effective_user.id)
+            await update.message.reply_text(response)
+        
+        async def scores_command(update, context):
+            arg = context.args[0] if context.args else ""
+            response = await handle_scores(update.effective_user.id, arg)
+            await update.message.reply_text(response)
+        
+        # Callback query handler for buttons
+        async def button_callback(update, context):
+            query = update.callback_query
+            await query.answer()
+            
+            data = query.data
+            if data == "labs":
+                response = await handle_labs(query.from_user.id)
+                await query.edit_message_text(response)
+            elif data == "health":
+                response = await handle_health(query.from_user.id)
+                await query.edit_message_text(response)
+            elif data == "help":
+                keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="back")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(
+                    "/start - Welcome\n"
+                    "/help - This help\n"
+                    "/health - Backend status\n"
+                    "/labs - List labs\n"
+                    "/scores <lab> - Scores for a lab",
+                    reply_markup=reply_markup
+                )
+            elif data == "scores_menu":
+                keyboard = [
+                    [InlineKeyboardButton("Lab 04", callback_data="scores_lab-04"),
+                     InlineKeyboardButton("Lab 05", callback_data="scores_lab-05")],
+                    [InlineKeyboardButton("Lab 06", callback_data="scores_lab-06"),
+                     InlineKeyboardButton("Lab 07", callback_data="scores_lab-07")],
+                    [InlineKeyboardButton("🔙 Back", callback_data="back")],
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text("Select a lab:", reply_markup=reply_markup)
+            elif data.startswith("scores_lab-"):
+                lab = data.replace("scores_", "")
+                response = await handle_scores(query.from_user.id, lab)
+                await query.edit_message_text(response)
+            elif data == "back":
+                keyboard = [
+                    [InlineKeyboardButton("📋 Labs", callback_data="labs"),
+                     InlineKeyboardButton("📊 Scores", callback_data="scores_menu")],
+                    [InlineKeyboardButton("ℹ️ Health", callback_data="health"),
+                     InlineKeyboardButton("❓ Help", callback_data="help")],
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text("Welcome back! Choose an option:", reply_markup=reply_markup)
+        
+        # Register handlers
+        app.add_handler(CommandHandler("start", start_command))
+        app.add_handler(CommandHandler("help", help_command))
+        app.add_handler(CommandHandler("health", health_command))
+        app.add_handler(CommandHandler("labs", labs_command))
+        app.add_handler(CommandHandler("scores", scores_command))
+        
+        # Message handler for natural language
         async def text_handler(update, context):
             user_message = update.message.text
             response = await handle_message(user_id=update.effective_user.id, text=user_message)
             await update.message.reply_text(response)
         
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+        app.add_handler(CallbackQueryHandler(button_callback))
         
         print("Bot is running... Press Ctrl+C to stop.")
-        await app.run_polling()
         
-    except ImportError:
-        print("ERROR: python-telegram-bot not installed. Run: uv sync")
+        # Start the bot
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+        
+        # Keep running
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            pass
+        finally:
+            await app.updater.stop()
+            await app.stop()
+            await app.shutdown()
+            
+    except ImportError as e:
+        print(f"ERROR: {e}. Run: uv add python-telegram-bot")
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: {e}")
         sys.exit(1)
 
 
@@ -109,4 +215,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nBot stopped.")
+        sys.exit(0)
